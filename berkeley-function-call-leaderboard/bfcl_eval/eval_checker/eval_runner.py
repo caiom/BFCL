@@ -362,14 +362,17 @@ def runner(model_names, test_categories, result_dir, score_dir):
     # Filter out the subdirectories
     subdirs = [entry for entry in entries if entry.is_dir()]
 
+    model_names_underscore = [model_name.replace("/", "_") for model_name in model_names]
+
     # Traverse each subdirectory
     for subdir in tqdm(subdirs, desc="Number of models evaluated"):
 
         model_name = subdir.relative_to(result_dir).name
-        if model_names is not None and model_name not in model_names:
+        if model_names_underscore is not None and model_name not in model_names_underscore:
+            print(f"Skipping model: {model_name} as it is not in the specified model list {model_names}.")
             continue
 
-        model_name_escaped = model_name.replace("_", "/")
+        model_name_escaped = model_names[0]
 
         print(f"🦍 Model: {model_name}")
 

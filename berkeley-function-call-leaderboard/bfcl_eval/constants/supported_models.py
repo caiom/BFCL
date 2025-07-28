@@ -13,6 +13,10 @@
 # -----------------------------------------------------------------------------
 
 SUPPORTED_MODELS = [
+    "/data/caiocesart/models/long_context_2B_v1/base_phi4ft_b1M_s4_64k_nv/4770/fp32/llama/",
+    "/data/caiocesart/models/long_context_2B_v1/base_tulu_64k_b1M_s4/399/fp32/llama",
+    "/data/caiocesart/models/long_context_2B_v1/base_line_tulu_1_epoch/399/fp32/llama",
+    "/data/caiocesart/models/long_context_2B_v1/base_phi4ft_b250k_nv/4770/fp32/llama/",
     "gorilla-openfunctions-v2",
     "DeepSeek-R1-0528",
     "DeepSeek-R1-0528-FC",

@@ -199,7 +199,10 @@ def generate_leaderboard_csv(
     data_multi_turn = []
     data_combined = []
     for model_name, value in leaderboard_table.items():
-        model_name_escaped = model_name.replace("_", "/")
+        if model_name == "microsoft_phi-4":
+            model_name_escaped = model_name.replace("_", "/")
+        else:
+            model_name_escaped = model_name
         model_config = MODEL_CONFIG_MAPPING[model_name_escaped]
 
         cost_data = value.get("cost", {"input_data": [], "output_data": []})

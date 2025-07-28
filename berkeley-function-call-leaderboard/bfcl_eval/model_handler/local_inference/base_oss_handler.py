@@ -106,7 +106,7 @@ class OSSHandler(BaseHandler, EnforceOverrides):
                 "trust_remote_code": True,
             }
 
-        self.tokenizer = AutoTokenizer.from_pretrained(**load_kwargs)
+        self.tokenizer = AutoTokenizer.from_pretrained("microsoft/phi-4")
         config = AutoConfig.from_pretrained(**load_kwargs)
 
         if hasattr(config, "max_position_embeddings"):
