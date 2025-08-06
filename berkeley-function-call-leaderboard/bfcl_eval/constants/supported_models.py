@@ -13,6 +13,13 @@
 # -----------------------------------------------------------------------------
 
 SUPPORTED_MODELS = [
+    "/data/hbehl/ckpts/tool-call-models/phi4-sft-tool-v3a/llama/",
+    "/data/hbehl/ckpts/tool-call-models/phi4-sft-tool-4x/llama/",
+    "/data/hbehl/ckpts/tool-call-models/phi4-sft-tool-v3/llama/",
+    "/data/hbehl/ckpts/tool-call-models/phi4-sft-tool-v2/llama/",
+    "/data/hbehl/ckpts/tool-call-models/phi4-sft-tool/llama/",
+    "/data/hbehl/ckpts/phi-4-sft-long/4770/fp32/llama/",
+    "/data/hbehl/ckpts/phi_4_sft_long/4770/fp32/llama/",
     "/data/caiocesart/models/long_context_2B_v1/base_phi4ft_b1M_s4_64k_nv/4770/fp32/llama/",
     "/data/caiocesart/models/long_context_2B_v1/base_tulu_64k_b1M_s4/399/fp32/llama",
     "/data/caiocesart/models/long_context_2B_v1/base_line_tulu_1_epoch/399/fp32/llama",
