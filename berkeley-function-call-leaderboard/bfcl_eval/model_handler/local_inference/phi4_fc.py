@@ -57,8 +57,8 @@ class Phi4FCHandler(OSSHandler):
         assert 0 <= len(system_messages) <= 1
 
         # set the system message
-        system_message = "You are a helpful assistant that can answer questions and provide information based on the provided context.\n\n# Tools\n\nYou may call one or more functions to assist with the user query.\n\nYou are provided with function signatures within <|tool|><|/tool|> tags.\n"
-        system_message_end = "\n\nFor each function call, return a json object with function name and arguments within <|tool_call|><|/tool_call|> tags.\nExample: <|tool_call|>{\"name\": <function-name>, \"arguments\": <args-json-object>}<|/tool_call|>"
+        system_message = "You are a helpful assistant that can answer questions and provide information based on the provided context.\n\n# Tools\n\nYou may call one or more functions to assist with the user query.\nIf none of the functions can be used, point it out. If the given question lacks the parameters required by the function, also point it out.You should only return the function calls in your response.\n\nYou are provided with function signatures within <|tool|><|/tool|> tags.\n"
+        system_message_end = "\n\nIf you decide to invoke any of the function(s), for each function call, return a json object with function name and arguments within <|tool_call|><|/tool_call|> tags.\nExample: <|tool_call|>{\"name\": <function-name>, \"arguments\": <args-json-object>}<|/tool_call|>\nYou SHOULD NOT include any other text in the response.\nAt each turn, you should try your best to complete the tasks requested by the user within the current turn. Continue to output functions to call until you have fulfilled the user's request to the best of your ability. Once you have no more functions to call, the system will consider the current turn complete and proceed to the next turn or task."
         if messages[0]["role"] == "system":
             system_message = messages[0]["content"]
             messages = messages[1:]
