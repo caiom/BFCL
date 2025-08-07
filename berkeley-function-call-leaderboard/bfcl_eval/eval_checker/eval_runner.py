@@ -395,7 +395,7 @@ def runner(model_names, test_categories, result_dir, score_dir):
                 result_dir,
                 score_dir,
                 model_result,
-                model_name,
+                model_name_escaped,
                 handler,
                 state,
             )
@@ -499,7 +499,7 @@ def main(model, test_categories, result_dir, score_dir):
             # Runner takes in the model name that contains "_", instead of "/", for the sake of file path issues.
             # This is differnet than the model name format that the generation script "openfunctions_evaluation.py" takes in (where the name contains "/").
             # We patch it here to avoid confusing the user.
-            model_names.append(model_name.replace("/", "_"))
+            model_names.append(model_name)
 
     # Driver function to run the evaluation for all categories involved.
     runner(model_names, all_test_categories, result_dir, score_dir)

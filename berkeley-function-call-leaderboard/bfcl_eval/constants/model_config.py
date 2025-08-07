@@ -56,6 +56,7 @@ from bfcl_eval.model_handler.local_inference.minicpm_fc import MiniCPMFCHandler
 from bfcl_eval.model_handler.local_inference.mistral_fc import MistralFCHandler
 from bfcl_eval.model_handler.local_inference.phi import PhiHandler
 from bfcl_eval.model_handler.local_inference.phi_fc import PhiFCHandler
+from bfcl_eval.model_handler.local_inference.phi4_fc import Phi4FCHandler
 from bfcl_eval.model_handler.local_inference.quick_testing_oss import (
     QuickTestingOSSHandler,
 )
@@ -117,6 +118,18 @@ class ModelConfig:
 
 # Inference through API calls
 api_inference_model_map = {
+    "/data/caiocesart/models/tool-call-models/phi4_sft_tool/fp32/llama": ModelConfig(
+        model_name="/data/caiocesart/models/tool-call-models/phi4_sft_tool/fp32/llama/",
+        display_name="ph4 sft tool (FC)",
+        url="https://huggingface.co/microsoft/phi-4",
+        org="Microsoft",
+        license="MIT",
+        model_handler=Phi4FCHandler,
+        input_price=None,
+        output_price=None,
+        is_fc_model=True,
+        underscore_to_dot=False,
+    ),
     "/data/hbehl/ckpts/tool-call-models/phi4-sft-tool-v3a/llama/": ModelConfig(
         model_name="/data/hbehl/ckpts/tool-call-models/phi4-sft-tool-v3a/llama/",
         display_name="base_line_tulu_1_epoch (Prompt)",
