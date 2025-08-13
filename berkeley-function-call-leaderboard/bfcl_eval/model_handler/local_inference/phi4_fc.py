@@ -71,10 +71,49 @@ class Phi4FCHandler(OSSHandler):
         formatted_prompt = (
             f"<|im_start|>system<|im_sep|>{system_message}<|tool|>{tool_contents}<|/tool|>{system_message_end}<|im_end|>"
         )
-        for msg in messages:
+
+        # print("\n\nNEW MESSAGE\n\n")
+
+        prev_msg_tool_call = False
+        for idx, msg in enumerate(messages):
             role = msg["role"]
             content = msg["content"]
-            formatted_prompt += f"<|im_start|>{role}<|im_sep|>{content}<|im_end|>"
+
+            # print(f"Role: {role}, Content: {content}")
+            prev_msg_tool_call = False
+
+            next_msg_tool_response = messages[idx + 1]["role"] == "tool" if idx < len(messages) - 1 else False
+
+            if role == "assistant":
+                tool_calls = self._extract_tool_calls(content)
+
+                if tool_calls:
+                    prev_msg_tool_call = True
+
+                # if next_msg_tool_response and tool_calls:
+                #     formatted_prompt += f"<|im_start|>{role}<|im_sep|>{content}"
+                # else:
+                formatted_prompt += f"<|im_start|>{role}<|im_sep|>{content}<|im_end|>"
+
+            elif role == "tool":
+
+                prev_role = messages[idx - 1]["role"] if idx > 0 else None
+                next_role = messages[idx + 1]["role"] if idx < len(messages) - 1 else None
+
+                if idx == 0 or prev_role != "tool":
+                    formatted_prompt += "<|im_start|>user<|im_sep|>"
+
+                formatted_prompt += f"<|tool_response|>{content}<|/tool_response|>"
+
+                if idx == len(messages) - 1 or next_role != "tool":
+                    formatted_prompt += "<|im_end|>"
+
+                # if next_msg_tool_response:
+                #     formatted_prompt += f"<|tool_response|>{content}<|/tool_response|>"
+                # else:
+                #     formatted_prompt += f"<|tool_response|>{content}<|/tool_response|><|im_end|>"
+            else:
+                formatted_prompt += f"<|im_start|>{role}<|im_sep|>{content}<|im_end|>"
 
         # provide the generation prompt token
         formatted_prompt += "<|im_start|>assistant<|im_sep|>"
@@ -121,6 +160,7 @@ class Phi4FCHandler(OSSHandler):
         """
         model_responses_message_for_chat_history = api_response.choices[0].text
         model_responses = api_response.choices[0].text
+
         extracted_tool_calls = self._extract_tool_calls(model_responses)
 
         if (
