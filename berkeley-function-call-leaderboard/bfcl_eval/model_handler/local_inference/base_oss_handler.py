@@ -106,7 +106,7 @@ class OSSHandler(BaseHandler, EnforceOverrides):
                 "trust_remote_code": True,
             }
 
-        self.tokenizer = AutoTokenizer.from_pretrained("microsoft/phi-4")
+        self.tokenizer = AutoTokenizer.from_pretrained("/data/caiocesart/models/Phi-7B/original")
         config = AutoConfig.from_pretrained(**load_kwargs)
 
         if hasattr(config, "max_position_embeddings"):
@@ -119,6 +119,8 @@ class OSSHandler(BaseHandler, EnforceOverrides):
                     "Model does not have a max_position_embeddings attribute or tokenizer.model_max_length attribute. Please set the max_context_length attribute in the corresponding model handler."
                 )
         print(f"Max context length: {self.max_context_length}")
+
+        self.max_context_length = 16384
 
         if not skip_server_setup:
             if backend == "vllm":
@@ -323,6 +325,9 @@ class OSSHandler(BaseHandler, EnforceOverrides):
 
         # Tokenize the formatted prompt to get token count
         input_token_count = len(self.tokenizer.tokenize(formatted_prompt))
+
+        print(f"max context length: {self.max_context_length}")
+        print(f"input token count: {input_token_count}")
 
         # Determine the number of tokens to request. Cap it at 4096 if the model has a larger limit.
         if self.max_context_length < input_token_count + 2:

@@ -13,6 +13,9 @@
 # -----------------------------------------------------------------------------
 
 SUPPORTED_MODELS = [
+    "/data/caiocesart/models/Phi-7B/original",
+    "/data/caiocesart/models/tool-call-models/phi4-sft-tool-4x/llama",
+    "/data/caiocesart/models/tool-call-models/phi4_sft_tool_v3a/phi4-sft-tool-v3a/llama",
     "/data/caiocesart/models/tool-call-models/phi4_sft_tool/fp32/llama",
     "/data/hbehl/ckpts/tool-call-models/phi4-sft-tool-v3a/llama/",
     "/data/hbehl/ckpts/tool-call-models/phi4-sft-tool-4x/llama/",

@@ -57,6 +57,7 @@ from bfcl_eval.model_handler.local_inference.mistral_fc import MistralFCHandler
 from bfcl_eval.model_handler.local_inference.phi import PhiHandler
 from bfcl_eval.model_handler.local_inference.phi_fc import PhiFCHandler
 from bfcl_eval.model_handler.local_inference.phi4_fc import Phi4FCHandler
+from bfcl_eval.model_handler.local_inference.phi_7b import Phi7bHandler
 from bfcl_eval.model_handler.local_inference.quick_testing_oss import (
     QuickTestingOSSHandler,
 )
@@ -118,6 +119,42 @@ class ModelConfig:
 
 # Inference through API calls
 api_inference_model_map = {
+    "/data/caiocesart/models/Phi-7B/original": ModelConfig(
+        model_name="/data/caiocesart/models/Phi-7B/original",
+        display_name="Phi-4-7B original (prompt)",
+        url="https://huggingface.co/microsoft/phi-4",
+        org="Microsoft",
+        license="MIT",
+        model_handler=Phi7bHandler,
+        input_price=None,
+        output_price=None,
+        is_fc_model=False,
+        underscore_to_dot=False,
+    ),
+    "/data/caiocesart/models/tool-call-models/phi4-sft-tool-4x/llama": ModelConfig(
+        model_name="/data/caiocesart/models/tool-call-models/phi4-sft-tool-4x/llama",
+        display_name="ph4 sft tool 4x(FC)",
+        url="https://huggingface.co/microsoft/phi-4",
+        org="Microsoft",
+        license="MIT",
+        model_handler=Phi4FCHandler,
+        input_price=None,
+        output_price=None,
+        is_fc_model=True,
+        underscore_to_dot=False,
+    ),
+    "/data/caiocesart/models/tool-call-models/phi4_sft_tool_v3a/phi4-sft-tool-v3a/llama": ModelConfig(
+        model_name="/data/caiocesart/models/tool-call-models/phi4_sft_tool_v3a/phi4-sft-tool-v3a/llama",
+        display_name="ph4 sft tool v3a(FC)",
+        url="https://huggingface.co/microsoft/phi-4",
+        org="Microsoft",
+        license="MIT",
+        model_handler=Phi4FCHandler,
+        input_price=None,
+        output_price=None,
+        is_fc_model=True,
+        underscore_to_dot=False,
+    ),
     "/data/caiocesart/models/tool-call-models/phi4_sft_tool/fp32/llama": ModelConfig(
         model_name="/data/caiocesart/models/tool-call-models/phi4_sft_tool/fp32/llama/",
         display_name="ph4 sft tool (FC)",
