@@ -36,6 +36,18 @@ def get_args():
     parser.add_argument("--temperature", type=float, default=0.001)
     parser.add_argument("--include-input-log", action="store_true", default=False)
     parser.add_argument("--exclude-state-log", action="store_true", default=False)
+    parser.add_argument(
+        "--log-raw-model-io",
+        action="store_true",
+        default=False,
+        help="Log formatted prompts and raw model outputs to a JSONL file for debugging.",
+    )
+    parser.add_argument(
+        "--raw-model-io-path",
+        type=str,
+        default=None,
+        help="Path to write raw model I/O JSONL logs. Defaults to ./raw_model_io.jsonl.",
+    )
     parser.add_argument("--num-threads", required=False, type=int)
     parser.add_argument("--num-gpus", default=1, type=int)
     parser.add_argument("--backend", default="vllm", type=str, choices=["vllm", "sglang"])
@@ -190,6 +202,9 @@ def multi_threaded_inference(handler, test_case, include_input_log, exclude_stat
 
     assert type(test_case["function"]) is list
 
+    if isinstance(handler, OSSHandler):
+        handler.set_current_test_id(test_case.get("id"))
+
     try:
         result, metadata = handler.inference(
             test_case, include_input_log, exclude_state_log
@@ -226,6 +241,10 @@ def generate_results(args, model_name, test_cases_total):
     if isinstance(handler, OSSHandler):
         handler: OSSHandler
         is_oss_model = True
+        handler.configure_raw_model_io(
+            log_raw_model_io=getattr(args, "log_raw_model_io", False),
+            raw_model_io_path=getattr(args, "raw_model_io_path", None),
+        )
         # For OSS models, if the user didn't explicitly set the number of threads,
         # we default to 100 threads to speed up the inference.
         num_threads = (

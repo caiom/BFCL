@@ -779,8 +779,6 @@ def runner(
         if model_names is not None and model_name not in model_names:
             continue
 
-        model_name_escaped = model_name.replace("_", "/")
-
         print(f"🦍 Model: {model_name}")
 
         # Find and process all result JSON files recursively in the subdirectory
@@ -789,7 +787,13 @@ def runner(
             if test_category not in test_categories:
                 continue
 
-            handler = get_handler(model_name_escaped)
+            # Prefer exact key match first (supports custom IDs that include "_"),
+            # then fall back to legacy "_" -> "/" conversion for old slash-based IDs.
+            model_key_for_lookup = model_name
+            if model_key_for_lookup not in MODEL_CONFIG_MAPPING:
+                model_key_for_lookup = model_name.replace("_", "/")
+
+            handler = get_handler(model_key_for_lookup)
 
             # We don't evaluate the following categories in the current iteration of the benchmark
             if (

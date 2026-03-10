@@ -193,9 +193,25 @@ def save_eval_results(
     return accuracy, len(model_result)
 
 
+def _resolve_model_config_key(model_name: str) -> str:
+    """
+    Resolve leaderboard/result model names to a key in MODEL_CONFIG_MAPPING.
+    Prefer exact key match first, then fallback to legacy "_" -> "/" mapping.
+    """
+    if model_name in MODEL_CONFIG_MAPPING:
+        return model_name
+
+    legacy_key = model_name.replace("_", "/")
+    if legacy_key in MODEL_CONFIG_MAPPING:
+        return legacy_key
+
+    raise KeyError(model_name)
+
+
 def get_cost_latency_info(model_name, cost_data, latency_data):
     cost, mean_latency, std_latency, percentile_95_latency = "N/A", "N/A", "N/A", "N/A"
-    model_config = MODEL_CONFIG_MAPPING[model_name]
+    model_key = _resolve_model_config_key(model_name)
+    model_config = MODEL_CONFIG_MAPPING[model_key]
 
     # For API models, we use the input and output token counts to calculate the cost
     if model_config.input_price is not None and model_config.output_price is not None:
@@ -297,13 +313,13 @@ def generate_leaderboard_csv(leaderboard_table, output_path):
     data_format_sensitivity = []
     data_combined = []
     for model_name, value in leaderboard_table.items():
-        model_name_escaped = model_name.replace("_", "/")
-        model_config = MODEL_CONFIG_MAPPING[model_name_escaped]
+        model_key = _resolve_model_config_key(model_name)
+        model_config = MODEL_CONFIG_MAPPING[model_key]
 
         cost_data = value.get("cost", {"input_data": [], "output_data": []})
         latency_data = value.get("latency", {"data": []})
         cost, latency_mean, latency_std, percentile_95_latency = get_cost_latency_info(
-            model_name_escaped, cost_data, latency_data
+            model_key, cost_data, latency_data
         )
 
         # Non-Live Score

@@ -25,6 +25,12 @@ berkeley-function-call-leaderboard/result/
 # Ignore leaderboard score
 berkeley-function-call-leaderboard/score/
 
+# Ignore logs
+berkeley-function-call-leaderboard/logs/
+
+# Ignore raw model io
+berkeley-function-call-leaderboard/raw_model_io.jsonl
+
 # Ignore environment variables
 berkeley-function-call-leaderboard/.env
 !berkeley-function-call-leaderboard/bfcl_eval/.env.example

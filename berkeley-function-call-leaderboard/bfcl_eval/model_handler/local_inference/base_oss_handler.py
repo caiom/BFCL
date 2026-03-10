@@ -1,3 +1,4 @@
+import json
 import os
 import subprocess
 import threading
@@ -47,6 +48,10 @@ class OSSHandler(BaseHandler, EnforceOverrides):
         self.base_url = os.getenv("REMOTE_OPENAI_BASE_URL", f"http://{self.local_server_endpoint}:{self.local_server_port}/v1")
         self.api_key = os.getenv("REMOTE_OPENAI_API_KEY", "EMPTY")
         self.client = OpenAI(base_url=self.base_url, api_key=self.api_key)
+        self.log_raw_model_io = False
+        self.raw_model_io_path: Optional[str] = None
+        self.raw_model_io_lock = threading.Lock()
+        self._thread_local = threading.local()
 
     @override
     def inference(
@@ -70,6 +75,30 @@ class OSSHandler(BaseHandler, EnforceOverrides):
     @override
     def decode_execute(self, result, has_tool_call_tag):
         return default_decode_execute_prompting(result, has_tool_call_tag)
+
+    def configure_raw_model_io(
+        self, log_raw_model_io: bool = False, raw_model_io_path: Optional[str] = None
+    ) -> None:
+        self.log_raw_model_io = log_raw_model_io
+        self.raw_model_io_path = None
+        if not self.log_raw_model_io:
+            return
+
+        resolved_path = Path(raw_model_io_path or "raw_model_io.jsonl").expanduser().resolve()
+        resolved_path.parent.mkdir(parents=True, exist_ok=True)
+        resolved_path.write_text("", encoding="utf-8")
+        self.raw_model_io_path = str(resolved_path)
+
+    def set_current_test_id(self, test_id: Optional[str]) -> None:
+        self._thread_local.test_id = test_id
+
+    def _write_raw_model_io(self, entry: dict) -> None:
+        if not self.log_raw_model_io or not self.raw_model_io_path:
+            return
+        line = json.dumps(entry, ensure_ascii=True)
+        with self.raw_model_io_lock:
+            with open(self.raw_model_io_path, "a", encoding="utf-8") as handle:
+                handle.write(line + "\n")
 
     @final
     def spin_up_local_server(
@@ -137,18 +166,21 @@ class OSSHandler(BaseHandler, EnforceOverrides):
                 config = AutoConfig.from_pretrained(**load_kwargs)
         else:
             # Standard loading for local models or when no specific tokenizer path is provided
-            self.tokenizer = AutoTokenizer.from_pretrained(**load_kwargs)
-            config = AutoConfig.from_pretrained(**load_kwargs)
+            self.tokenizer = AutoTokenizer.from_pretrained("/data/caiocesart/tokenizers/microsoft_phi-4-reasoning-think")
+            # config = AutoConfig.from_pretrained(**load_kwargs)
 
-        if hasattr(config, "max_position_embeddings"):
-            self.max_context_length = config.max_position_embeddings
-        elif self.tokenizer.model_max_length is not None:
-            self.max_context_length = self.tokenizer.model_max_length
-        else:
-            if not hasattr(self, "max_context_length"):
-                raise ValueError(
-                    "Model does not have a max_position_embeddings attribute or tokenizer.model_max_length attribute. Please set the max_context_length attribute in the corresponding model handler."
-                )
+        # if hasattr(config, "max_position_embeddings"):
+        #     self.max_context_length = config.max_position_embeddings
+        # elif self.tokenizer.model_max_length is not None:
+        #     self.max_context_length = self.tokenizer.model_max_length
+
+
+        self.max_context_length = 32768
+        # else:
+        #     if not hasattr(self, "max_context_length"):
+        #         raise ValueError(
+        #             "Model does not have a max_position_embeddings attribute or tokenizer.model_max_length attribute. Please set the max_context_length attribute in the corresponding model handler."
+        #         )
         print(f"Max context length: {self.max_context_length}")
 
         self._server_process = process = None
@@ -341,25 +373,79 @@ class OSSHandler(BaseHandler, EnforceOverrides):
         if hasattr(self, "skip_special_tokens"):
             extra_body["skip_special_tokens"] = self.skip_special_tokens
 
+        if self.log_raw_model_io:
+            self._write_raw_model_io(
+                {
+                    "event": "request",
+                    "test_id": getattr(self._thread_local, "test_id", None),
+                    "model": self.model_path_or_id,
+                    "prompt": formatted_prompt,
+                    "max_tokens": leftover_tokens_count,
+                    "temperature": self.temperature,
+                    "timestamp": time.time(),
+                }
+            )
+
         start_time = time.time()
-        if len(extra_body) > 0:
-            api_response = self.client.completions.create(
-                model=self.model_path_or_id,
-                temperature=self.temperature,
-                prompt=formatted_prompt,
-                max_tokens=leftover_tokens_count,
-                extra_body=extra_body,
-                timeout=72000,  # Avoid timeout errors
-            )
-        else:
-            api_response = self.client.completions.create(
-                model=self.model_path_or_id,
-                temperature=self.temperature,
-                prompt=formatted_prompt,
-                max_tokens=leftover_tokens_count,
-                timeout=72000,  # Avoid timeout errors
-            )
+        try:
+            if len(extra_body) > 0:
+                api_response = self.client.completions.create(
+                    model=self.model_path_or_id,
+                    temperature=self.temperature,
+                    prompt=formatted_prompt,
+                    max_tokens=leftover_tokens_count,
+                    extra_body=extra_body,
+                    timeout=72000,  # Avoid timeout errors
+                )
+            else:
+                api_response = self.client.completions.create(
+                    model=self.model_path_or_id,
+                    temperature=self.temperature,
+                    prompt=formatted_prompt,
+                    max_tokens=leftover_tokens_count,
+                    timeout=72000,  # Avoid timeout errors
+                )
+        except Exception as exc:
+            if self.log_raw_model_io:
+                self._write_raw_model_io(
+                    {
+                        "event": "error",
+                        "test_id": getattr(self._thread_local, "test_id", None),
+                        "model": self.model_path_or_id,
+                        "error": str(exc),
+                        "timestamp": time.time(),
+                    }
+                )
+            raise
         end_time = time.time()
+
+        if self.log_raw_model_io:
+            response_text = None
+            response_id = None
+            usage_data = None
+            try:
+                response_id = getattr(api_response, "id", None)
+                response_text = api_response.choices[0].text
+                usage = getattr(api_response, "usage", None)
+                if usage is not None:
+                    usage_data = {
+                        "prompt_tokens": getattr(usage, "prompt_tokens", None),
+                        "completion_tokens": getattr(usage, "completion_tokens", None),
+                        "total_tokens": getattr(usage, "total_tokens", None),
+                    }
+            except Exception:
+                pass
+            self._write_raw_model_io(
+                {
+                    "event": "response",
+                    "test_id": getattr(self._thread_local, "test_id", None),
+                    "model": self.model_path_or_id,
+                    "response_id": response_id,
+                    "response_text": response_text,
+                    "usage": usage_data,
+                    "timestamp": time.time(),
+                }
+            )
 
         return api_response, end_time - start_time
 
