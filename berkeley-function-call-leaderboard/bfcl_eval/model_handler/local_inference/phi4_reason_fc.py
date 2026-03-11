@@ -3,8 +3,74 @@ import re
 from typing import Any
 
 from bfcl_eval.model_handler.local_inference.base_oss_handler import OSSHandler
+from bfcl_eval.model_handler.local_inference.prompts import prompts
 from bfcl_eval.model_handler.utils import convert_to_function_call
 from overrides import override
+
+
+def _extract_system_prompt(
+    messages: list[dict], default_system: str
+) -> tuple[str, list[dict]]:
+    if messages and messages[0]["role"] == "system":
+        return messages[0]["content"], messages[1:]
+    return default_system, messages
+
+
+def _serialize_reason_history(formatted_prompt: str, messages: list[dict]) -> str:
+    for msg in messages:
+        role = msg["role"]
+        content = msg["content"]
+
+        if role == "tool":
+            formatted_prompt += (
+                f"<|im_start|>user<|im_sep|><tool_response>{content}</tool_response>"
+                "<|im_end|>"
+            )
+        elif role == "assistant":
+            assistant_content = content if isinstance(content, str) else ""
+            reasoning_content = msg.get("reasoning_content", "")
+
+            if reasoning_content:
+                assistant_content = (
+                    "<think>"
+                    + reasoning_content.strip("\n")
+                    + "</think>"
+                    + assistant_content.lstrip("\n")
+                )
+
+            for tool_call in msg.get("tool_calls", []):
+                if isinstance(tool_call, dict) and "function" in tool_call:
+                    tool_call = tool_call["function"]
+                if not isinstance(tool_call, dict):
+                    continue
+
+                name = tool_call.get("name", "")
+                arguments = tool_call.get("arguments", {})
+                if not isinstance(arguments, str):
+                    arguments = json.dumps(arguments)
+
+                assistant_content += (
+                    '<tool_call>{"name": "'
+                    + name
+                    + '", "arguments": '
+                    + arguments
+                    + "}</tool_call>"
+                )
+
+            formatted_prompt += (
+                f"<|im_start|>{role}<|im_sep|>{assistant_content}<|im_end|>"
+            )
+        else:
+            formatted_prompt += f"<|im_start|>{role}<|im_sep|>{content}<|im_end|>"
+
+    return formatted_prompt
+
+
+def _build_system_prompt_from_template(prompt_key: str, function: list[dict]) -> str:
+    return prompts[prompt_key].replace(
+        "{tools}",
+        "\n".join(json.dumps(tool) for tool in function),
+    )
 
 
 class Phi4ReasonFCHandler(OSSHandler):
@@ -28,105 +94,13 @@ class Phi4ReasonFCHandler(OSSHandler):
 
     @override
     def _format_prompt(self, messages, function):
-        # sanity check
-        system_messages = [msg for msg in messages if msg["role"] == "system"]
-        assert 0 <= len(system_messages) <= 1
-
-        # set the system message
-        system_message = (
-            "You are a reasoning language model that can reach precise answers through "
-            "careful reasoning and tool use when needed. \n\nStructure Rules:\n1. All "
-            "reasoning goes between <think> and </think> (thinking block). \n2. Whenever "
-            "a tool would improve your answer, invoke it using <tool_call>...</tool_call> "
-            "instead of relying solely on memory.\n3. Issue one or multiple tool calls "
-            "<tool_call></tool_call>...<tool_call></tool_call> at a time; when tool calls "
-            "can't be called in parallel (you need the result of one to call the other) you can sequentially interleave throughout the "
-            "reasoning process (using the result of one to guide the call of the "
-            "other). \n4. After each tool call or calls, the results of each tool call "
-            "will be provided in the <tool_response></tool_response>..."
-            "<tool_response></tool_response> tags.\n5. Stop the generation only after "
-            "reaching the final answer.\n\nYou can utilize the tools as many times as "
-            "required. For example, <think> reasoning here  </think> <tool_call> tool "
-            "call here </tool_call> <tool_response> output of tool call </tool_response> "
-            "<think> reasoning process here </think> final answer here (or more tool "
-            "calls).\n\n# Format for tool calls: <tool_call>{\"name\": "
-            "<function-name>,\"arguments\": <dict-of-arguments>}</tool_call>\n\n"
-            "# Available Tools\nYou are provided with function signatures within "
-            "<tool></tool> tags.\n"
+        system_prompt = _build_system_prompt_from_template(
+            "bfcl_simple_parallel", function
         )
-        system_message_end = (
-            "\n\nYou SHOULD NOT include any other text in the response or ask the user "
-            "for information, use reasonable assumptions for function calls. Only if the "
-            "available functions are not relevant or there are mandatory missing params "
-            "that you should output text and point it out.\nAt each turn, you should try "
-            "your best to complete the tasks requested by the user within the current "
-            "turn. Continue to output functions to call until you have fulfilled the "
-            "user's request to the best of your ability. Once you have output a text "
-            "with no function calls (could be empty or with any text), the system will "
-            "consider the current turn complete and proceed to the next turn or task."
-        )
-        if messages and messages[0]["role"] == "system":
-            system_message = messages[0]["content"]
-            messages = messages[1:]
+        system_prompt, messages = _extract_system_prompt(messages, system_prompt)
 
-        # extract the tool contents
-        tool_contents = json.dumps([func for func in function])
-
-        # format the rest of the prompt
-        formatted_prompt = (
-            f"<|im_start|>system<|im_sep|>{system_message}<tool>{tool_contents}</tool>"
-            f"{system_message_end}<|im_end|>"
-        )
-
-        for msg in messages:
-            role = msg["role"]
-            content = msg["content"]
-
-            if role == "tool":
-                formatted_prompt += (
-                    f"<|im_start|>user<|im_sep|><tool_response>{content}</tool_response>"
-                    "<|im_end|>"
-                )
-            elif role == "assistant":
-                assistant_content = content if isinstance(content, str) else ""
-                reasoning_content = msg.get("reasoning_content", "")
-
-                # Preserve previously generated reasoning for stable multi-step behavior.
-                if reasoning_content:
-                    assistant_content = (
-                        "<think>"
-                        + reasoning_content.strip("\n")
-                        + "</think>"
-                        + assistant_content.lstrip("\n")
-                    )
-
-                # Preserve previous tool calls in chat history.
-                for idx, tool_call in enumerate(msg.get("tool_calls", [])):
-                    if isinstance(tool_call, dict) and "function" in tool_call:
-                        tool_call = tool_call["function"]
-                    if not isinstance(tool_call, dict):
-                        continue
-
-                    name = tool_call.get("name", "")
-                    arguments = tool_call.get("arguments", {})
-                    if not isinstance(arguments, str):
-                        arguments = json.dumps(arguments)
-
-                    assistant_content += (
-                        '<tool_call>{"name": "'
-                        + name
-                        + '", "arguments": '
-                        + arguments
-                        + "}</tool_call>"
-                    )
-
-                formatted_prompt += (
-                    f"<|im_start|>{role}<|im_sep|>{assistant_content}<|im_end|>"
-                )
-            else:
-                formatted_prompt += f"<|im_start|>{role}<|im_sep|>{content}<|im_end|>"
-
-        # provide the generation prompt token
+        formatted_prompt = f"<|im_start|>system<|im_sep|>{system_prompt}<|im_end|>"
+        formatted_prompt = _serialize_reason_history(formatted_prompt, messages)
         formatted_prompt += "<|im_start|>assistant<|im_sep|><think>"
         return formatted_prompt
 
